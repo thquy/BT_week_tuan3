@@ -1,26 +1,23 @@
-# ===== Build stage =====
-FROM maven:3.8.7-eclipse-temurin-17 AS build
+# Stage 1: Build với Maven
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
-
-# Copy pom.xml trước để cache dependencies
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
-# Copy source code
-COPY src ./src
-
-# Build ra file WAR
+COPY . .
 RUN mvn clean package -DskipTests
 
-# ===== Run stage =====
+# Stage 2: Run bằng Tomcat
 FROM tomcat:9.0-jdk17
-WORKDIR /usr/local/tomcat
 
-# Xóa ROOT mặc định
-RUN rm -rf webapps/ROOT
+# Xóa app mặc định
+RUN rm -rf /usr/local/tomcat/webapps/*
 
-# Copy WAR build ra làm ROOT.war
-COPY --from=build /app/target/*.war webapps/ROOT.war
+# Copy war đã build
+COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
 
-EXPOSE 8080
+# Render sẽ cung cấp biến PORT
+ENV PORT=8080
+
+# Config Tomcat dùng PORT của Render
+RUN sed -i "s/8080/${PORT}/g" /usr/local/tomcat/conf/server.xml
+
+EXPOSE ${PORT}
 CMD ["catalina.sh", "run"]
